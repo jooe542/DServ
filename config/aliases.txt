@@ -1,0 +1,13 @@
+# Custom aliases
+alias dcl="docker container ls"
+alias dcla="docker container ls -a"
+alias dcp="docker container prune -f"
+alias dil="docker image ls"
+alias dip="docker image prune -a"
+alias dicl="docker image ls && docker container ls -a"
+
+alias pts="ss -nlt"
+alias rng="service nginx restart && service nginx status"
+alias rpg="service postgresql restart && service postgresql status"
+alias rnp="service nginx restart && service postgresql restart && service nginx status && service postgresql status"
+# ---

@@ -1,0 +1,27 @@
+..p**--- DSystem server handling ---**p..
+..r**Run with administrator role!**r..
+
+Commands:
+    --help 
+        Show these helpnotes.
+
+    install [all | base | virtualmin | dotnet | nginx | certbot | postgresql | openssh-server | openproject | docker]
+        Install packages automatically.
+
+    uninstall [all | virtualmin | dotnet | nginx | postgresql | openssh-server | openproject | docker]"
+        Uninstall packages automatically.
+
+    isys 
+        Install the DServ with its components into the system.
+
+    unisys
+        Uninstall the DServ with all of its components from the system.
+        **DELETES ALL DATA!**
+
+    -v
+        Show version.
+
+Basic package content:
+   net-tools, iproute2, wget, tree, htop, tmux, nano
+        
+   Licenced under GPLv3

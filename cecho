@@ -1,0 +1,171 @@
+#!/bin/bash
+
+block_arr=()
+pattern_colorblock_start="\.\.[rgbypcwx]"
+pattern_colorblock_end="[rgbypcwx]\.\."
+
+# Make an array from the given color blocks.
+# $1: Color blocks
+# Example: make_color_block_array "..rapple juicer.. ..rvr.. ..rapple **juice**r.."
+# OUT: The generated array into the 'block_array' global variable.
+make_color_block_array() {
+    str=$1
+    test_str=""
+    block_arr=()
+    lng=$((${#str} - 2))
+
+    for ((i = 0; i < $lng; i++)); do
+        test=${str:$i:3}
+        grp=$(echo "${test}" | grep -o "${pattern_colorblock_end}")
+
+        if [ "${test}" = "${grp}" ]; then
+            test_str+=$test
+            block_arr+=("${test_str}")
+            test_str=""
+            i=$(($i + 3))
+            continue
+        fi
+
+        test_str+="${str:$i:1}"
+    done
+}
+
+# Format the given colorblock. Transform the syntax into escape sequences. 
+#   ..x: black, ..r: red, ..g: green, ..b: blue
+#   ..y: yellow, ..p: purple, ..c: cyan, ..w: white
+#
+# $1: string to format
+# Example: format_colorblock "..rSTR*ING*BLOCKr..."
+# Example: fromat_colorblock "..gSTR**ING**BLOCKg..."
+# OUT: "\e[0;2;32mDATA \e[0;2;32mDATA\e[1;2;32mDATA\e[0m"
+format_colorblock() {
+    formatted=$1
+    block_color=""
+    subst_bold_italic=""
+    subst_bold=""
+    subst_italic=""
+    color="${formatted:2:1}"
+
+    case $color in
+    r)
+        block_color="\\\e[31m"
+        subst_bold_italic="\\\e[1;3;31m\1\\\e[0;31m"
+        subst_bold="\\\e[1;31m\1\\\e[0;31m"
+        subst_italic="\\\e[3;31m\1\\\e[0;31m"
+        ;;
+    g)
+        block_color="\\\e[32m"
+        subst_bold_italic="\\\e[1;3;32m\1\\\e[0;32m"
+        subst_bold="\\\e[1;32m\1\\\e[0;32m"
+        subst_italic="\\\e[3;32m\1\\\e[0;32m"
+        ;;
+    b)
+        block_color="\\\e[34m"
+        subst_bold_italic="\\\e[1;3;34m\1\\\e[0;34m"
+        subst_bold="\\\e[1;34m\1\\\e[0;34m"
+        subst_italic="\\\e[3;34m\1\\\e[0;34m"
+        ;;
+    y)
+        block_color="\\\e[33m"
+        subst_bold_italic="\\\e[1;3;33m\1\\\e[0;33m"
+        subst_bold="\\\e[1;33m\1\\\e[0;33m"
+        subst_italic="\\\e[3;33m\1\\\e[0;33m"
+        ;;
+    p)
+        block_color="\\\e[35m"
+        subst_bold_italic="\\\e[1;3;35m\1\\\e[0;35m"
+        subst_bold="\\\e[1;35m\1\\\e[0;35m"
+        subst_italic="\\\e[3;35m\1\\\e[0;35m"
+        ;;
+    c)
+        block_color="\\\e[36m"
+        subst_bold_italic="\\\e[1;3;36m\1\\\e[0;36m"
+        subst_bold="\\\e[1;36m\1\\\e[0;36m"
+        subst_italic="\\\e[3;36m\1\\\e[0;36m"
+        ;;
+    w)
+        block_color="\\\e[37m"
+        subst_bold_italic="\\\e[1;3;37m\1\\\e[0;37m"
+        subst_bold="\\\e[1;37m\1\\\e[0;37m"
+        subst_italic="\\\e[3;37m\1\\\e[0;37m"
+        ;;
+    x)
+        block_color="\\\e[30m"
+        subst_bold_italic="\\\e[1;3;30m\1\\\e[0;30m"
+        subst_bold="\\\e[1;30m\1\\\e[0;30m"
+        subst_italic="\\\e[3;30m\1\\\e[0;30m"
+        ;;
+    esac
+
+    formatted=$(echo "${formatted}" | sed -r "s/${pattern_colorblock_start}/${block_color}/g")
+    formatted=$(echo "${formatted}" | sed -r "s/${pattern_colorblock_end}/\\\e[0m/g")
+    formatted=$(echo "${formatted}" | sed -r "s/${pattern_bold_italic}/${subst_bold_italic}/g")
+    formatted=$(echo "${formatted}" | sed -r "s/${pattern_bold}/${subst_bold}/g")
+    formatted=$(echo "${formatted}" | sed -r "s/${pattern_italic}/${subst_italic}/g")
+
+    echo -e "${formatted}"
+}
+
+# Compile the given string into escape sequenced string.
+# $1: The string to compile.
+# OUT: The compiled string.
+compile_str() {
+    compiled=$1
+    data=$1
+    pattern_bold_italic="\*\*\*([^*]+)\*\*\*"
+    pattern_bold="\*\*([^*]+)\*\*"
+    pattern_italic="\*([^*]+)\*"
+    groups=""
+    
+    for color in r g b y p c w x; do
+        pattern="(\.\.${color})(.*?)(${color}\.\.)"
+        groups=$(echo "${data}" | grep -Po "${pattern}")
+        make_color_block_array "${groups}"
+
+        for block in "${block_arr[@]}"; do
+            formatted_colorblock=$(format_colorblock "${block}")
+            compiled=$(echo "${compiled}" | perl -pe "s/\Q${block}\E/${formatted_colorblock}/g")
+        done
+    done
+
+    compiled=$(echo "${compiled}" | sed -r "s/${pattern_bold_italic}/\\\e[1;3m\1\\\e[0m/g")
+    compiled=$(echo "${compiled}" | sed -r "s/${pattern_bold}/\\\e[1m\1\\\e[0m/g")
+    compiled=$(echo "${compiled}" | sed -r "s/${pattern_italic}/\\\e[3m\1\\\e[0m/g")
+
+    echo -en "${compiled}"
+}
+
+help() {
+    compile_str "..p**--------- Colored Echo ---------**p..\n"
+    compile_str "..g**Usage:**g.. ..ycecho \"text to format\"y..\n"
+    compile_str "..b**Format patterns:**b.. \n"
+    compile_str "\t..g**Italic:          **g.. ..y*texty.."; compile_str "..y*y..\n"
+    compile_str "\t..g**Bold:            **g.. ..y**texty.."; compile_str "..y**y..\n"
+    compile_str "\t..g**Italic and bold: **g.. ..y***texty.."; compile_str "..y***y..\n"
+    compile_str "..b**Coloros:**b.. \n"
+    compile_str "\t..g**Red:**g..    ..r.r....r.r....rrr.."; compile_str "..rTEXTr....rrr....r.r....r.r..\n"
+    compile_str "\t..g**Green:**g..  ..g.g....g.g....ggg.."; compile_str "..gTEXTg....ggg....g.g....g.g..\n"
+    compile_str "\t..g**Blue:**g..   ..b.b....b.b....bbb.."; compile_str "..bTEXTb....bbb....b.b....b.b..\n"
+    compile_str "\t..g**Yellow:**g.. ..y.y....y.y....yyy.."; compile_str "..yTEXTy....yyy....y.y....y.y..\n"
+    compile_str "\t..g**Purple:**g.. ..p.p....p.p....ppp.."; compile_str "..pTEXTp....ppp....p.p....p.p..\n"
+    compile_str "\t..g**Cyan:**g..   ..c.c....c.c....ccc.."; compile_str "..cTEXTc....ccc....c.c....c.c..\n"
+    compile_str "\t..g**White:**g..  ..w.w....w.w....www.."; compile_str "..wTEXTw....www....w.w....w.w..\n"
+    compile_str "\t..g**Black:**g..  ..x.x....x.x....xxx.."; compile_str "..xTEXTx....xxx....x.x....x.x..\n"
+    compile_str "..b**Examples**b..\n"
+    echo -en    "\tcecho \"..rThis is a red line.r.."; echo "\n\"" 
+    compile_str "\t..rThis is a red line.r..\n"
+    echo -en    "\tcecho \"..bThis is a blue **formatted** line.b.."; echo "\n\""
+    compile_str "\t..bThis is a blue **formatted** line.b..\n" 
+    echo -en    "\tcecho \"..bThisb.. ..y***is***y.. a too *complicated* ..r*line*r..."; echo "\n\"" 
+    compile_str "\t..bThisb.. ..y***is***y.. a too *complicated* ..r*line*r...\n"
+    echo -e "\t\tLicenced under GPLv3\n"   
+}
+
+if [ $# -eq 0 ]; then 
+    help
+elif [ $# -gt 1 ]; then
+    compile_str "..r**Parameter error!**r.."
+else
+    content=$1
+    compile_str "${content}"
+fi
