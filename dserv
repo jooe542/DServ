@@ -7,81 +7,84 @@
 # ---------------------------------------------------------------------------- #
 
 help() {
-    cecho "$(cat /etc/dserv/help.txt)" 
+	cecho "$(cat /etc/dserv/help.txt)"
 }
 
 version() {
-    echo "Verzio: 0.6"
+	echo "Version: 0.7"
 }
 
 isys() {
-    cecho "..p**--- Installing DServ ---**p..\n" 
-    echo "Make folders..."
-    mkdir -p /etc/dserv/{config,apps} 
-    
-    echo "Copying files..."
-    cp help.txt /etc/dserv/help.txt
-    cp -r config/* /etc/dserv/config/
-    cp -r apps/* /etc/dserv/apps/
+	echo "------------------------"
+	echo "    Installing DServ    "
+	echo "------------------------"
 
-    echo "Copying scripts..."
-    cp cecho /bin/cecho    
-    cp dserv /bin/dserv
-    cp dserv-setup.sh /bin/dserv-setup.sh
-    cp dserv-sysconfig.sh /bin/dserv-sysconfig.sh
+	echo "--- Make folders..."
+	mkdir -p /etc/dserv/{config,apps}
 
-    echo "Setting up script permissions..."
-    chmod 755 /bin/cecho
-    chmod 700 /bin/dserv
-    chmod 700 /bin/dserv-setup.sh
-    chmod 700 /bin/dserv-sysconfig.sh
+	echo "--- Copying files..."
+	cp help.txt /etc/dserv/help.txt
+	cp -r config/* /etc/dserv/config/
+	cp -r apps/* /etc/dserv/apps/
 
-    echo "Configure timezone..." 
-    dserv-sysconfig.sh timezone
-    
-    echo "Setting up aliases..."
-    dserv-sysconfig.sh aliases
-    
-    echo "Install base packages..."
-    dserv-setup.sh install base
-    
-    cecho "..g**Success!**g..\n"
+	echo "--- Copying scripts..."
+	cp cecho /bin/cecho
+	cp dserv /bin/dserv
+	cp dserv-setup.sh /bin/dserv-setup.sh
+	cp dserv-sysconfig.sh /bin/dserv-sysconfig.sh
+
+	echo "--- Setting up script permissions..."
+	chmod 755 /bin/cecho
+	chmod 700 /bin/dserv
+	chmod 700 /bin/dserv-setup.sh
+	chmod 700 /bin/dserv-sysconfig.sh
+
+	echo "--- Configure timezone..."
+	dserv-sysconfig.sh timezone
+
+	echo "--- Setting up aliases..."
+	dserv-sysconfig.sh aliases
+
+	echo "--- Install base packages..."
+	dserv-setup.sh install base
+
+	cecho "..g**Success!**g..\n"
 }
 
 unisys() {
-    cecho "..y**Uninstalling DServ**y..\n"
+	cecho "..y**Uninstalling DServ**y..\n"
 
-    echo "Deleting main folder (/etc/dserv) and its content..."
-    rm -r /etc/dserv
+	cecho "..cDeleting main folder (/etc/dserv) and its content... c..\n"
+	rm -r /etc/dserv
 
-    echo "Deleting scripts..."
-    rm /bin/dserv*
-    
-    cecho "..g**Success!**g..\n"
+	cecho "..cDeleting scripts... c..\n"
+	rm /bin/dserv*
+
+	cecho "..g**Success!**g..\n"
 }
 
 case $1 in
-    --help)
-        help
-        ;;
-    -v)
-        version
-        ;;
-    isys)
-        isys
-        ;;
-    unisys)
-        unisys
-        ;;
-    install)
-        dserv-setup.sh install $2
-        ;;
-    uninstall)
-        dserv-setup.sh uninstall $2
-        ;;
-    *)
-        help
-        ;;
+--help)
+	help
+	;;
+-v)
+	version
+	;;
+isys)
+	isys
+	;;
+unisys)
+	unisys
+	;;
+install)
+	dserv-setup.sh install "$2"
+	;;
+uninstall)
+	dserv-setup.sh uninstall "$2"
+	;;
+*)
+	help
+	;;
 esac
 
 exit 0

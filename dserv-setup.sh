@@ -11,8 +11,6 @@ cRed="\e[31m"
 confDir="/etc/dserv/config"
 appsDir="/etc/dserv/apps"
 
-opDbConf="host\top_gl\topenproject\t127.0.0.1/24\tscram-sha-256 #DServ OP\n"
-
 setuplog="${cMagenta}------- A telepites eredmenye -------${cDef}\r\n"
 
 # Kiechozza a megadott uzenetet a megadott szinnel
@@ -38,9 +36,17 @@ log_entry() {
 
 # Alapcsomagok telepitese
 install_base() {
-	cecho "..p**| info | Install basic tools.**p.."
+	cecho "..p**| info | Install basic tools.** p.."
 
-	apt-get install -y net-tools iproute2 wget tree htop tmux vim
+	echo "-"
+	cecho "..cUpdate packages... c..\n"
+	echo "-"
+	apt -y update
+
+	echo "-"
+	cecho "..cInstall base packages.. c..\n"
+	echo "-"
+	apt-get install -y net-tools iproute2 wget tree htop tmux vim ranger
 
 	newEntry=$(log_entry $cGreen "success" "Alapcsomag - Telepites befejezve")
 	setuplog+=$newEntry
@@ -140,7 +146,7 @@ install_nginx() {
 		return 1
 	fi
 
-	cecho "..p**| info | Install NGINX**p.."
+	cecho "\n..p**| info | Install NGINX**p.."
 	cecho "..c| 1 | Setup PPAc.."
 
 	apt-get install -y curl gnupg2 ca-certificates lsb-release ubuntu-keyring
@@ -152,10 +158,10 @@ install_nginx() {
 
 	case "$gpgOut" in
 	*573BFD6B3D8FBC641079A6ABABF5BD827BD9BF62*)
-		cecho "..g| info | Fingerprint is validg.."
+		cecho "..g| info | Fingerprint is validg..\n"
 		;;
 	*)
-		cecho "..y| warning | Fingerprint is not valid!y.."
+		cecho "..y| warning | Fingerprint is not valid!y..\n"
 		newEntry=$(log_entry $cYellow "warning" "Nginx - Az ujjlenyomat nem egyezik")
 		setuplog+=$newEntry
 		;;
@@ -168,10 +174,13 @@ install_nginx() {
 	echo "Package: *\nPin: origin nginx.org\nPin: release o=nginx\nPin-Priority: 900\n" |
 		tee /etc/apt/preferences.d/99nginx
 
-	cecho "..c| 2 | Installc.."
+	cecho "\n..c| 2 | Installc..\n"
 
 	apt-get update
 	apt-get install -y nginx
+
+	mkdir /etc/nginx/conf.disabled
+	mv /etc/nginx/conf.d/default.conf /etc/nginx/conf.disabled/default.conf
 
 	newEntry=$(log_entry $cGreen "success" "Nginx - Install success")
 	setuplog+=$newEntry
@@ -201,41 +210,37 @@ install_openssh_server() {
 }
 
 install_openproject() {
-	cecho "..cCheck PostgreSQL...c..\n"
-	install_postgresql
-
-	cecho "..cCheck Docker...c..\n"
+	cecho "\n..c**Check Docker...**c..\n"
 	install_docker
 
-	cecho "..cCheck NGINX...c..\n"
+	cecho "\n..c**Check NGINX...**c..\n"
 	install_nginx
 
-	cecho "..cSetup database...c..\n"
-	pghome="/etc/postgresql/14/main"
+	# Setup NGINX configuration
+	cecho "\n..c**Type the sitename:**c.. "
+	read -r response
+	response=${response,,}
+	response=$(echo "${response}" | sed "s/\./\\./g")
 
-	if ! grep -q "${opDbConf}" "${pghome}/pg_hba.conf"; then
-		#	if [ $? -gt 0 ]; then
-		psql -U postgres -c "create role openproject with login password 'DAJiUM5Z9QI6XegkZopKm';"
-		psql -U postgres -c "create database op_gl with owner openproject encoding UTF8;"
+	sed -r "s/^[ \t]*server_name.*$/\tserver_name ${response};/g" "${confDir}/ng_openproject.conf" >"/etc/nginx/conf.d/ng_openproject.conf"
 
-		echo -e "${opDbConf}" >>"${pghome}/pg_hba.conf"
-		service postgresql restart
+	# Build Docker files
+	cd "${appsDir}/openproject" || return 1
+	chmod 700 build
+
+	if ! ./build; then
+		return 1
 	fi
 
-	cecho "..cLoad Docker image **op_gl.tar**...c.."
-	#	docker load -i "${appsDir}/op_gl.tar"
-
-	if ! docker load -i "${appsDir}/op_gl.tar"; then
-		#	if [ $? -gt 0 ]; then
-		cecho "..r**Failed!**r.."
-		exit 3
+	cecho "..cStarting Docker containers... c..\n"
+	if docker compose -f "${confDir}/compose/openproject.yml" up -d; then
+		cecho "\n..y**Docker volumes exposed to etc->dserv->apps->openrpoject**y..\n"
+		cecho "..g**Everything is up!**g..\n"
+		return 0
 	fi
 
-	cecho "..cStarting Docker containers...c..\n"
-	docker compose -f "${confDir}/compose/op_gl.yml" up -d
-
-	cecho "..g**Everything is up!**g..\n"
-	return 0
+	cecho "..r**Failed to start Openproject!**r..\n"
+	return 2
 }
 
 install_php() {
@@ -342,30 +347,10 @@ uninstall_openssh_server() {
 	apt-get -y purge openssh-server
 }
 
+## UNIMPLEMENTED
 uninstall_openproject() {
-	cecho "..w**Every data with the database will be erase!**w..\n"
-	cecho "..w**This action also includes the database.**w..\n"
-	read -r -p "Are you sure? [y/n]" response
-	response=${response,,}
-
-	if [ "${response}" != "yes" ] && [ "${response}" != "y" ]; then
-		return 1
-	fi
-
-	echo "..cDelete Docker containers and images...c..\n"
-	docker compose -f "${confDir}/compose/op_gl.yml" down
-	docker image rm op_gl
-
-	cecho "..cDelete PostgreSQL settings and database...c..\n"
-	if ! grep -q "${opDbConf}" "${pghome}/pg_hba.conf"; then
-		sed "s/${opDbConf}//g" "${pghome}/pg_hba.conf"
-		psql -U postgres -c "drop database op_gl with (force);"
-		psql -U postgres -c "drop user openproject;"
-		service postgresql restart
-	fi
-
-	cecho "..gUninstall completed!g..\n"
-	return 0
+	cecho "..y**UNIMPLEMENTED!**y..\n"
+	return 1
 }
 
 uninstall_php() {
