@@ -253,47 +253,32 @@ install_php() {
 	service php8.2-fpm start
 }
 
-# GitLab Docker Telepítése
-install_gitlab_docker() {
+install_gitlab() {
+	cecho "..p--- Install GitLab ---p..\n"
+	cecho "..c**Check NGINX...**c..\n"
+	install_nginx
 
-	cecho "..cCheck NGINX...c..\n"
-    install_nginx
+	cecho "..c**| 1 | Pull GitLab Docker image**c..\n"
+	if ! docker pull gitlab/gitlab-ce:latest; then
+		cecho "..r**Error: Failed to pull GitLab Docker image!**r..\n"
+		return 1
+	fi
 
-    cecho "..c| 1 | Pull GitLab Docker imagec.."
-    docker pull gitlab/gitlab-ce:latest
+	cecho "..c**| 2 | Setting up NGINX reverse proxy config**c..\n"
+	read -r -p "Enter the hostname for GitLab (e.g., gitlab.example.com): " hostname
+	hostname=${hostname,,}
+	hostname=$(echo "${hostname}" | sed "s/\./\\./g")
 
-    if [ $? -ne 0 ]; then
-        cecho "..cError: Failed to pull GitLab Docker image!c.."
-        echo "Error: Failed to pull GitLab Docker image!"
-        return 1
-    fi
+	sed -r "s/^[ \t]*server_name.*$/\tserver_name ${hostname};/g" "${confDir}/ng_gitlab.conf" >/etc/nginx/conf.d/ng_gitlab.conf
 
-	cecho "..c| 2 | Enter GitLab hostnamec.."
-	read -r "Enter the hostname for GitLab (e.g., gitlab.example.com): " response
-	hostname=${response,,}
+	cecho "..c**| 3 | Run GitLab Docker container**c..\n"
 
-	cp "${confDir}/ng_gitlab.conf" /etc/nginx/conf.d/ng_gitlab.conf
-	sed -r "s/^[ \t]*server_name.*$/\tserver_name ${response};/g" "${confDir}/ng_gitlab.conf"
-	service nginx restart
+	if ! docker compose -f "${confDir}/compose/gitlab.yml" up -d; then
+		cecho "..r**Error: Failed to start GitLab Docker!**r..\n"
+		return 2
+	fi
 
-    cecho "..c| 3 | Run GitLab Docker containerc.."
-    docker run --detach \
-        --hostname ${hostname} \
-        --publish 1001:1001 --publish 49653:49653 \
-        --name gitlab \
-        --restart always \
-        --volume /var/lib/gitlab/config:/etc/gitlab \
-        --volume /var/lib/gitlab/logs:/var/log/gitlab \
-        --volume /var/lib/gitlab/data:/var/opt/gitlab \
-        gitlab/gitlab-ce:latest
-
-    if [ $? -ne 0 ]; then
-        cecho "..rError: Failed to pull GitLab Docker image!r.."
-        echo "Error: Failed to start GitLab Docker image!"
-        return 2
-    fi
-
-    cecho "..gGitLab Docker container started successfully!g.."
+	cecho "..g**GitLab Docker container started successfully!**g..\n"
 }
 
 # Installal/beallit mindent is.
@@ -303,74 +288,50 @@ install_all() {
 	install_dotnet
 	install_nginx
 	install_docker
-	install_gitlab_docker
+	install_gitlab
 	echo -e $setuplog
 }
 
-# GitLab Törlése.
-gitlab_uninstall() {
-    if ! check_gitlab_installed; then
-        cecho "..yGitLab Docker is not installed.y.."
-        return 1
-    fi
+# Delete GitLab
+uninstall_gitlab() {
+	cecho "..c**Are you sure you want to uninstall GitLab Docker? (y/n)**c..\n"
+	read -r confirmation
 
-    cecho "..cAre you sure you want to uninstall GitLab Docker? (yes/no)c.."
-    read -r confirmation
+	case "$confirmation" in
+	[yY] | [yY][eE][sS])
+		if docker compose "${confDir}/compose/gitlab.yml down"; then
+			cecho "..g**GitLab Docker container stopped.**g..\n"
+		else
+			cecho "..r**Failed to stop GitLab Docker container.**r..\n"
+			return 11
+		fi
 
-    case "$confirmation" in
-        [yY]|[yY][eE][sS])
-            # GitLab Konténer Leállítása
-            stop_gitlab_container() {
-                if docker stop gitlab >/dev/null 2>&1; then
-                    cecho "..gGitLab Docker container stopped.g.."
-                else
-                    cecho "..rFailed to stop GitLab Docker container.r.."
-                fi
-            }
+		if docker image rm gitlab; then
+			cecho "..g**GitLab Docker container removed.**g..\n"
+		else
+			cecho "..r**Failed to remove GitLab Docker container.**r..\n"
+			return 12
+		fi
 
-            # GitLab Konténer Törlése
-            remove_gitlab_container() {
-                if docker rm gitlab >/dev/null 2>&1; then
-                    cecho "..gGitLab Docker container removed.g.."
-                else
-                    cecho "..rFailed to remove GitLab Docker container.r.."
-                fi
-            }
+		if rm -f /etc/nginx/conf.d/ng_gitlab.conf; then
+			cecho "..g**NGINX config file removed.**g..\n"
+		else
+			cecho "..r**Failed to remove NGINX config file.**r..\n"
+			return 13
+		fi
 
-            # GitLab Docker Image Törlése
-            remove_gitlab_image() {
-                if docker rmi gitlab/gitlab-ce:latest >/dev/null 2>&1; then
-                    cecho "..gGitLab Docker image removed.g.."
-                else
-                    cecho "..rFailed to remove GitLab Docker image.r.."
-                fi
-            }
-
-            # NGINX Konfig Törlése
-            remove_nginx_config() {
-                if rm -f /etc/nginx/conf.d/ng_gitlab.conf >/dev/null 2>&1; then
-                    cecho "..gNGINX config file removed.g.."
-                else
-                    cecho "..rFailed to remove NGINX config file.r.."
-                fi
-            }
-
-            stop_gitlab_container
-            remove_gitlab_container
-            remove_gitlab_image
-            remove_nginx_config
-            cecho "..gGitLab Docker uninstallation completed.g.."
-			return 0
-            ;;
-        [nN]|[nN][oO])
-            cecho "..rGitLab Docker uninstallation cancelled.r.."
-            return 1
-            ;;
-        *)
-            cecho "..yInvalid option. Exiting.y.."
-            return 2
-            ;;
-    esac
+		cecho "..g**GitLab Docker uninstallation completed.**g..\n"
+		return 0
+		;;
+	[nN] | [nN][oO])
+		cecho "..r**GitLab Docker uninstallation cancelled.**r..\n"
+		return 2
+		;;
+	*)
+		cecho "..y**Invalid option. Exiting.**y..\n"
+		return 3
+		;;
+	esac
 }
 
 # Telepiti a certbotot
