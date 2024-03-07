@@ -258,6 +258,34 @@ install_php() {
 	service php8.2-fpm start
 }
 
+install_gitlab() {
+	cecho "..p--- Install GitLab ---p..\n"
+	cecho "..c**Check NGINX...**c..\n"
+	install_nginx
+
+	cecho "..c**| 1 | Pull GitLab Docker image**c..\n"
+	if ! docker pull gitlab/gitlab-ce:latest; then
+		cecho "..r**Error: Failed to pull GitLab Docker image!**r..\n"
+		return 1
+	fi
+
+	cecho "..c**| 2 | Setting up NGINX reverse proxy config**c..\n"
+	read -r -p "Enter the hostname for GitLab (e.g., gitlab.example.com): " hostname
+	hostname=${hostname,,}
+	hostname=$(echo "${hostname}" | sed "s/\./\\./g")
+
+	sed -r "s/^[ \t]*server_name.*$/\tserver_name ${hostname};/g" "${confDir}/ng_gitlab.conf" >/etc/nginx/conf.d/ng_gitlab.conf
+
+	cecho "..c**| 3 | Run GitLab Docker container**c..\n"
+
+	if ! docker compose -f "${confDir}/compose/gitlab.yml" up -d; then
+		cecho "..r**Error: Failed to start GitLab Docker!**r..\n"
+		return 2
+	fi
+
+	cecho "..g**GitLab Docker container started successfully!**g..\n"
+}
+
 # Installal/beallit mindent is.
 install_all() {
 	install_base
@@ -265,7 +293,50 @@ install_all() {
 	install_dotnet
 	install_nginx
 	install_docker
+	install_gitlab
 	echo -e $setuplog
+}
+
+# Delete GitLab
+uninstall_gitlab() {
+	cecho "..c**Are you sure you want to uninstall GitLab Docker? (y/n)**c..\n"
+	read -r confirmation
+
+	case "$confirmation" in
+	[yY] | [yY][eE][sS])
+		if docker compose "${confDir}/compose/gitlab.yml down"; then
+			cecho "..g**GitLab Docker container stopped.**g..\n"
+		else
+			cecho "..r**Failed to stop GitLab Docker container.**r..\n"
+			return 11
+		fi
+
+		if docker image rm gitlab; then
+			cecho "..g**GitLab Docker container removed.**g..\n"
+		else
+			cecho "..r**Failed to remove GitLab Docker container.**r..\n"
+			return 12
+		fi
+
+		if rm -f /etc/nginx/conf.d/ng_gitlab.conf; then
+			cecho "..g**NGINX config file removed.**g..\n"
+		else
+			cecho "..r**Failed to remove NGINX config file.**r..\n"
+			return 13
+		fi
+
+		cecho "..g**GitLab Docker uninstallation completed.**g..\n"
+		return 0
+		;;
+	[nN] | [nN][oO])
+		cecho "..r**GitLab Docker uninstallation cancelled.**r..\n"
+		return 2
+		;;
+	*)
+		cecho "..y**Invalid option. Exiting.**y..\n"
+		return 3
+		;;
+	esac
 }
 
 # Telepiti a certbotot
@@ -406,6 +477,9 @@ install() {
 	php)
 		install_php
 		;;
+	gitlab)
+		install_gitlab
+		;;
 	esac
 }
 
@@ -440,6 +514,9 @@ uninstall() {
 		;;
 	php)
 		uninstall_php
+		;;
+	gitlab)
+		uninstall_gitlab
 		;;
 	esac
 }
