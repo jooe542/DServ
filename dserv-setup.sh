@@ -493,7 +493,7 @@ install() {
 		install_php
 		;;
 	gitlab)
-		install_gitlab_docker
+		install_gitlab
 		;;
 	esac
 }
