@@ -72,9 +72,9 @@ install_nodejs() {
 	cd $appsDir
 	wget https://nodejs.org/dist/v22.13.0/node-v22.13.0-linux-x64.tar.xz
 	tar -xf node-v22.13.0-linux-x64.tar.xz 
-	ln -s /node-v22.13.0-linux-x64/bin/npm /bin/npm
-	ln -s /node-v22.13.0-linux-x64/bin/npm /bin/npx	
+	echo $appsDir/node-v22.13.0-linux-x64/bin >> /etc/bash.bashrc
 	rm node-v22.13.0-linux-x64.tar.xz
+
 	cd /
 	newEntry=$(log_entry $cGreen "success" "NodeJs - Install sucess")
 	setuplog+=$newEntry
