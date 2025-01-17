@@ -1,0 +1,46 @@
+#!/bin/bash
+
+# exit 0 - Success
+# exit 1 - Image saving failed
+# exit 2 - Build failed
+
+cecho "..cClone openproject repository c..\n"
+if [ ! -d op_repo ]; then
+	if ! git clone https://github.com/opf/openproject.git --branch=stable/13 --depth=1 op_repo; then
+		cecho "..rFailed to clone Openproject repository from: https://github.com/opf/openproject.git branch=stable/13r..\n"
+		exit 1
+	fi
+fi
+
+cecho "..cClone openproject-gitlab-integration files into openproject... c..\n"
+if [ ! -d op_repo/modules/gitlab_integration ]; then
+	if ! git clone https://github.com/btey/openproject-gitlab-integration.git --depth=1 op_repo/modules/gitlab_integration; then
+		cecho "..rFailed to clone GitLab module from: https://github.com/btey/openproject-gitlab-integration.gitr../n"
+		exit 2
+	fi
+fi
+
+cecho "..cCopy files... c..\n"
+cp Gemfile.lock op_repo/Gemfile.lock
+cp Gemfile.modules op_repo/Gemfile.modules
+
+cecho "..cBuilding the Docker image... c..\n"
+if [ ! -d buildlog ]; then
+	mkdir buildlog
+fi
+
+buildtime=$(date +%Y-%m-%d\ %H_%M_%S)
+
+cecho "..cBuilding openproject Docker image... c..\n"
+if ! cd op_repo; then
+	cecho "..r**Failed to cd into op_repo/docker/prod!**r..\n"
+	exit 3
+fi
+
+if ! docker build -t dserv_openproject -f docker/prod/Dockerfile . >"/etc/dserv/apps/openproject/buildlog/openproject-docker_${buildtime}.log" 2>&1; then
+	cecho "..r**Build failed!**r..\n"
+	exit 4
+fi
+
+cecho "..r**Openproject docker image with gitlab integration building success!**r..\n"
+exit 0

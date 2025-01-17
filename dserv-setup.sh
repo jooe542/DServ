@@ -38,9 +38,17 @@ log_entry() {
 
 # Alapcsomagok telepitese
 install_base() {
-	cecho "..p**| info | Install basic tools.**p.."
+	cecho "..p**| info | Install basic tools.** p.."
 
-	apt-get install -y net-tools iproute2 wget tree htop tmux vim tar
+	echo "-"
+	cecho "..cUpdate packages... c..\n"
+	echo "-"
+	apt -y update
+
+	echo "-"
+	cecho "..cInstall base packages.. c..\n"
+	echo "-"
+	apt-get install -y net-tools iproute2 wget tree htop tmux vim tar ranger
 
 	newEntry=$(log_entry $cGreen "success" "Base package - Install sucess")
 	setuplog+=$newEntry
@@ -155,7 +163,7 @@ install_nginx() {
 		return 1
 	fi
 
-	cecho "..p**| info | Install NGINX**p.."
+	cecho "\n..p**| info | Install NGINX**p.."
 	cecho "..c| 1 | Setup PPAc.."
 
 	apt-get install -y curl gnupg2 ca-certificates lsb-release ubuntu-keyring
@@ -167,7 +175,7 @@ install_nginx() {
 
 	case "$gpgOut" in
 	*573BFD6B3D8FBC641079A6ABABF5BD827BD9BF62*)
-		cecho "..g| info | Fingerprint is validg.."
+		cecho "..g| info | Fingerprint is validg..\n"
 		;;
 	*)
 		cecho "..y| warning | Fingerprint is not valid!y.."
@@ -183,10 +191,13 @@ install_nginx() {
 	echo "Package: *\nPin: origin nginx.org\nPin: release o=nginx\nPin-Priority: 900\n" |
 		tee /etc/apt/preferences.d/99nginx
 
-	cecho "..c| 2 | Installc.."
+	cecho "\n..c| 2 | Installc..\n"
 
 	apt-get update
 	apt-get install -y nginx
+
+	mkdir /etc/nginx/conf.disabled
+	mv /etc/nginx/conf.d/default.conf /etc/nginx/conf.disabled/default.conf
 
 	newEntry=$(log_entry $cGreen "success" "Nginx - Install success")
 	setuplog+=$newEntry
@@ -216,41 +227,37 @@ install_openssh_server() {
 }
 
 install_openproject() {
-	cecho "..cCheck PostgreSQL...c..\n"
-	install_postgresql
-
-	cecho "..cCheck Docker...c..\n"
+	cecho "\n..c**Check Docker...**c..\n"
 	install_docker
 
-	cecho "..cCheck NGINX...c..\n"
+	cecho "\n..c**Check NGINX...**c..\n"
 	install_nginx
 
-	cecho "..cSetup database...c..\n"
-	pghome="/etc/postgresql/14/main"
+	# Setup NGINX configuration
+	cecho "\n..c**Type the sitename:**c.. "
+	read -r response
+	response=${response,,}
+	response=$(echo "${response}" | sed "s/\./\\./g")
 
-	if ! grep -q "${opDbConf}" "${pghome}/pg_hba.conf"; then
-		#	if [ $? -gt 0 ]; then
-		psql -U postgres -c "create role openproject with login password 'DAJiUM5Z9QI6XegkZopKm';"
-		psql -U postgres -c "create database op_gl with owner openproject encoding UTF8;"
+	sed -r "s/^[ \t]*server_name.*$/\tserver_name ${response};/g" "${confDir}/ng_openproject.conf" >"/etc/nginx/conf.d/ng_openproject.conf"
 
-		echo -e "${opDbConf}" >>"${pghome}/pg_hba.conf"
-		service postgresql restart
+	# Build Docker files
+	cd "${appsDir}/openproject" || return 1
+	chmod 700 build
+
+	if ! ./build; then
+		return 1
 	fi
 
-	cecho "..cLoad Docker image **op_gl.tar**...c.."
-	#	docker load -i "${appsDir}/op_gl.tar"
-
-	if ! docker load -i "${appsDir}/op_gl.tar"; then
-		#	if [ $? -gt 0 ]; then
-		cecho "..r**Failed!**r.."
-		exit 3
+	cecho "..cStarting Docker containers... c..\n"
+	if docker compose -f "${confDir}/compose/openproject.yml" up -d; then
+		cecho "\n..y**Docker volumes exposed to etc->dserv->apps->openrpoject**y..\n"
+		cecho "..g**Everything is up!**g..\n"
+		return 0
 	fi
 
-	cecho "..cStarting Docker containers...c..\n"
-	docker compose -f "${confDir}/compose/op_gl.yml" up -d
-
-	cecho "..g**Everything is up!**g..\n"
-	return 0
+	cecho "..r**Failed to start Openproject!**r..\n"
+	return 2
 }
 
 install_php() {
@@ -268,6 +275,34 @@ install_php() {
 	service php8.2-fpm start
 }
 
+install_gitlab() {
+	cecho "..p--- Install GitLab ---p..\n"
+	cecho "..c**Check NGINX...**c..\n"
+	install_nginx
+
+	cecho "..c**| 1 | Pull GitLab Docker image**c..\n"
+	if ! docker pull gitlab/gitlab-ce:latest; then
+		cecho "..r**Error: Failed to pull GitLab Docker image!**r..\n"
+		return 1
+	fi
+
+	cecho "..c**| 2 | Setting up NGINX reverse proxy config**c..\n"
+	read -r -p "Enter the hostname for GitLab (e.g., gitlab.example.com): " hostname
+	hostname=${hostname,,}
+	hostname=$(echo "${hostname}" | sed "s/\./\\./g")
+
+	sed -r "s/^[ \t]*server_name.*$/\tserver_name ${hostname};/g" "${confDir}/ng_gitlab.conf" >/etc/nginx/conf.d/ng_gitlab.conf
+
+	cecho "..c**| 3 | Run GitLab Docker container**c..\n"
+
+	if ! docker compose -f "${confDir}/compose/gitlab.yml" up -d; then
+		cecho "..r**Error: Failed to start GitLab Docker!**r..\n"
+		return 2
+	fi
+
+	cecho "..g**GitLab Docker container started successfully!**g..\n"
+}
+
 # Installal/beallit mindent is.
 install_all() {
 	install_base
@@ -275,7 +310,50 @@ install_all() {
 	install_dotnet
 	install_nginx
 	install_docker
+	install_gitlab
 	echo -e $setuplog
+}
+
+# Delete GitLab
+uninstall_gitlab() {
+	cecho "..c**Are you sure you want to uninstall GitLab Docker? (y/n)**c..\n"
+	read -r confirmation
+
+	case "$confirmation" in
+	[yY] | [yY][eE][sS])
+		if docker compose "${confDir}/compose/gitlab.yml down"; then
+			cecho "..g**GitLab Docker container stopped.**g..\n"
+		else
+			cecho "..r**Failed to stop GitLab Docker container.**r..\n"
+			return 11
+		fi
+
+		if docker image rm gitlab; then
+			cecho "..g**GitLab Docker container removed.**g..\n"
+		else
+			cecho "..r**Failed to remove GitLab Docker container.**r..\n"
+			return 12
+		fi
+
+		if rm -f /etc/nginx/conf.d/ng_gitlab.conf; then
+			cecho "..g**NGINX config file removed.**g..\n"
+		else
+			cecho "..r**Failed to remove NGINX config file.**r..\n"
+			return 13
+		fi
+
+		cecho "..g**GitLab Docker uninstallation completed.**g..\n"
+		return 0
+		;;
+	[nN] | [nN][oO])
+		cecho "..r**GitLab Docker uninstallation cancelled.**r..\n"
+		return 2
+		;;
+	*)
+		cecho "..y**Invalid option. Exiting.**y..\n"
+		return 3
+		;;
+	esac
 }
 
 # Telepiti a certbotot
@@ -368,30 +446,10 @@ uninstall_openssh_server() {
 	apt-get -y purge openssh-server
 }
 
+## UNIMPLEMENTED
 uninstall_openproject() {
-	cecho "..w**Every data with the database will be erase!**w..\n"
-	cecho "..w**This action also includes the database.**w..\n"
-	read -r -p "Are you sure? [y/n]" response
-	response=${response,,}
-
-	if [ "${response}" != "yes" ] && [ "${response}" != "y" ]; then
-		return 1
-	fi
-
-	echo "..cDelete Docker containers and images...c..\n"
-	docker compose -f "${confDir}/compose/op_gl.yml" down
-	docker image rm op_gl
-
-	cecho "..cDelete PostgreSQL settings and database...c..\n"
-	if ! grep -q "${opDbConf}" "${pghome}/pg_hba.conf"; then
-		sed "s/${opDbConf}//g" "${pghome}/pg_hba.conf"
-		psql -U postgres -c "drop database op_gl with (force);"
-		psql -U postgres -c "drop user openproject;"
-		service postgresql restart
-	fi
-
-	cecho "..gUninstall completed!g..\n"
-	return 0
+	cecho "..y**UNIMPLEMENTED!**y..\n"
+	return 1
 }
 
 uninstall_php() {
@@ -450,6 +508,9 @@ install() {
 	php)
 		install_php
 		;;
+	gitlab)
+		install_gitlab
+		;;
 	esac
 }
 
@@ -487,6 +548,9 @@ uninstall() {
 		;;
 	php)
 		uninstall_php
+		;;
+	gitlab)
+		uninstall_gitlab
 		;;
 	esac
 }

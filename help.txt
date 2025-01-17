@@ -5,10 +5,12 @@ Commands:
     --help 
         Show these helpnotes.
 
-    install [all | base | virtualmin | nodejs | dotnet | nginx | certbot | postgresql | openssh-server | openproject | docker]
+    install [all | base | virtualmin | nodejs | dotnet | nginx | certbot | 
+      postgresql | openssh-server | openproject | docker | gitlab ]
         Install packages automatically.
 
-    uninstall [all | virtualmin | nodejs | dotnet | nginx | postgresql | openssh-server | openproject | docker]"
+    uninstall [all | virtualmin | nodejs | dotnet | nginx | certbot |
+      postgresql | openssh-server | openproject | docker | gitlab ]
         Uninstall packages automatically.
 
     isys 
@@ -22,6 +24,6 @@ Commands:
         Show version.
 
 Basic package content:
-   net-tools, iproute2, wget, tree, htop, tmux, nano
-        
+   net-tools, iproute2, wget, tree, htop, tmux, vim, ranger
+
    Licenced under GPLv3
