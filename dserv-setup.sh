@@ -13,7 +13,7 @@ appsDir="/etc/dserv/apps"
 
 opDbConf="host\top_gl\topenproject\t127.0.0.1/24\tscram-sha-256 #DServ OP\n"
 
-setuplog="${cMagenta}------- A telepites eredmenye -------${cDef}\r\n"
+setuplog="${cMagenta}------- Installation results -------${cDef}\r\n"
 
 # Kiechozza a megadott uzenetet a megadott szinnel
 # $1 szin
@@ -40,31 +40,46 @@ log_entry() {
 install_base() {
 	cecho "..p**| info | Install basic tools.**p.."
 
-	apt-get install -y net-tools iproute2 wget tree htop tmux vim
+	apt-get install -y net-tools iproute2 wget tree htop tmux vim tar
 
-	newEntry=$(log_entry $cGreen "success" "Alapcsomag - Telepites befejezve")
+	newEntry=$(log_entry $cGreen "success" "Base package - Install sucess")
 	setuplog+=$newEntry
 	echo -e $newEntry
 }
 
 # Telepiti a certbotot
 install_certbot() {
-	meco $cMagenta "| info | Certbot telepitese"
+	meco $cMagenta "| info | Certbot install"
 
 	apt-get install -y certbot python3-certbot-nginx
 
-	newEntry=$(log_entry $cGreen "success" "Certbot - Telepites befejezve")
+	newEntry=$(log_entry $cGreen "success" "Certbot - Install sucess")
+	setuplog+=$newEntry
+	echo -e $newEntry
+}
+
+# NodeJs telepitese
+install_nodejs() {
+	meco $cMagenta "| info | NodeJs install"
+	cd $appsDir
+	wget https://nodejs.org/dist/v22.13.0/node-v22.13.0-linux-x64.tar.xz
+	tar -xf node-v22.13.0-linux-x64.tar.xz 
+	ln -s /node-v22.13.0-linux-x64/bin/npm /bin/npm
+	ln -s /node-v22.13.0-linux-x64/bin/npm /bin/npx	
+	rm node-v22.13.0-linux-x64.tar.xz
+	cd /
+	newEntry=$(log_entry $cGreen "success" "NodeJs - Install sucess")
 	setuplog+=$newEntry
 	echo -e $newEntry
 }
 
 # Telepiti a dotnet6-ot
 install_dotnet() {
-	cecho "..p**| info | Install .NET 6 and 8**p.."
+	cecho "..p**| info | Install .NET 6/.NET 8**p.."
 
 	apt-get -y install dotnet6 dotnet8
 
-	newEntry=$(log_entry $cGreen "success" ".NET 6 - Telepites befejezve")
+	newEntry=$(log_entry $cGreen "success" ".NET 6/.NET 8 - Install sucess")
 	setuplog+=$newEntry
 	echo -e $newEntry
 }
@@ -78,13 +93,13 @@ install_docker() {
 		return 1
 	fi
 
-	meco $cMagenta "| info | Docker engine telepitese"
+	meco $cMagenta "| info | Docker engine install"
 
-	meco $cCyan "| 1 | Meglevo fuggosegek torlese"
+	meco $cCyan "| 1 | Delete dependencies"
 
 	for pkg in docker.io docker-doc docker-compose podman-docker containerd runc; do apt-get remove $pkg; done
 
-	meco $cCyan "| 2 | Repo beallitasa"
+	meco $cCyan "| 2 | Setting up repository"
 	apt-get update
 	apt-get install -y ca-certificates curl gnupg
 
@@ -98,12 +113,12 @@ install_docker() {
 		tee /etc/apt/sources.list.d/docker.list >/dev/null
 
 	# Install docker engine
-	meco $cCyan "| 3 | Telepites"
+	meco $cCyan "| 3 | Install"
 	apt-get update
 	apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
 	#docker run hello-world
 
-	newEntry=$(log_entry $cGreen "success" "Docker - Telepites befejezve")
+	newEntry=$(log_entry $cGreen "success" "Docker - Install sucess")
 	setuplog+=$newEntry
 	echo -e $newEntry
 }
@@ -111,9 +126,9 @@ install_docker() {
 # Virtualmin telepitese
 # Forras: https://www.virtualmin.com/download/
 install_virtualmin() {
-	meco $cMagenta "| info | virtualmin telepitese"
+	meco $cMagenta "| info | Virtualmin install"
 
-	meco $cCyan "| 1 | virtualmin letoltese"
+	meco $cCyan "| 1 | Virtualmin download"
 
 	if [ ! -d files ]; then
 		mkdir files
@@ -122,11 +137,11 @@ install_virtualmin() {
 	cd files
 	wget https://software.virtualmin.com/gpl/scripts/virtualmin-install.sh
 
-	meco $cCyan "| 1 | virtualmin telepitese"
+	meco $cCyan "| 1 | Virtualmin install"
 	sh virtualmin-install.sh -b LEMP --force
 	cd ..
 
-	newEntry=$(log_entry $cGreen "success" "virtualmin - Telepites befejezve")
+	newEntry=$(log_entry $cGreen "success" "Virtualmin - Install sucess")
 	setuplog+=$newEntry
 	echo -e $newEntry
 }
@@ -156,7 +171,7 @@ install_nginx() {
 		;;
 	*)
 		cecho "..y| warning | Fingerprint is not valid!y.."
-		newEntry=$(log_entry $cYellow "warning" "Nginx - Az ujjlenyomat nem egyezik")
+		newEntry=$(log_entry $cYellow "warning" "Nginx - Different fingerprint")
 		setuplog+=$newEntry
 		;;
 	esac
@@ -265,59 +280,70 @@ install_all() {
 
 # Telepiti a certbotot
 uninstall_certbot() {
-	meco $cMagenta "| info | Certbot torlese"
+	meco $cMagenta "| info | Certbot uninstall"
 
 	apt-get autoremove -y certbot
 	apt-get purge -y certbot
 	apt-get autoremove -y python3-certbot-nginx
 	apt-get purge -y python3-certbot-nginx
 
-	meco $cCyan "| info | Kesz"
+	meco $cCyan "| info | Success"
+}
+
+# NodeJs telepitese
+uninstall_nodejs() {
+	meco $cMagenta "| info | NodeJs uninstall"
+	cd $appsDir
+	rm -r node-v22.13.0-linux-x64
+	rm /bin/npm
+	rm /bin/npx	
+	cd /
+	meco $cCyan "| info | Success"
 }
 
 uninstall_dotnet() {
-	meco $cMagenta "| info | .NET 6 torlese"
+	meco $cMagenta "| info | .NET 6 uninstall"
 
 	apt-get -y autoremove dotnet6
 	apt-get -y purge dotnet6
 
-	meco $cCyan "| info | Kesz"
+	meco $cCyan "| info | Success"
 }
 
 # Torli a docker-t valamint a telepitese soran letrehozott mappakat, rendszermodositasokat.
 uninstall_docker() {
-	meco $cMagenta "| info | Docker beallitasok torlese"
+	meco $cMagenta "| info | Docker uninstall"
 
 	apt-get -y autremove docker
 	apt-get -y purge docker
 
-	meco $cCyan "| info | Kesz"
+	meco $cCyan "| info | Success"
 }
 
 # Virtualmin torlese
 # Forras: https://www.virtualmin.com/documentation/installation/uninstalling/
 uninstall_virtualmin() {
-	meco $cMagenta "| info | virtualmin torlese"
+	meco $cMagenta "| info | Virtualmin uninstall"
 
 	if [ -d files ]; then
 		cd files
 		if [ -a virtualmin-install.sh ]; then
 			sh virtualmin-install.sh --uninstall
 		else
-			meco $cRed "| error | A virtualmin telepitoje hianyzik!"
+			meco $cRed "| error | Virtualmin installer doesn't exists!"
 		fi
 		cd ..
 	else
-		meco $cRed "| error | A 'files' konyvtar hianyzik!"
-		meco $cRed "| error | A virtualmin telepitoje nem erheto el!"
+		meco $cRed "| error | The 'files' folder doesn't exists!"
+		meco $cRed "| error | Virtualmin installer doesn't reachable!"
 	fi
 
-	meco $cCyan "| info | Kesz"
+	meco $cCyan "| info | Success"
 }
 
 # Torli az nginx-t valamint a telepitese soran letrehozott mappakat, rendszermodositasokat.
 uninstall_nginx() {
-	meco $cMagenta "| info | Nginx beallitasok torlese"
+	meco $cMagenta "| info | Nginx uninstall"
 
 	systemctl status stop nginx
 	apt-get -y autoremove nginx
@@ -327,7 +353,7 @@ uninstall_nginx() {
 		rm -r /etc/nginx
 	fi
 
-	meco $cCyan "| info | Kesz"
+	meco $cCyan "| info | Success"
 }
 
 # PostgreSQL torlese
@@ -376,14 +402,14 @@ uninstall_php() {
 
 # Torol mindent is.
 uninstall_all() {
-	meco $cMagenta "DServ programok/beallitasok torlese"
+	meco $cMagenta "DServ programs/settings uninstall"
 
 	uninstall_virtualmin
 	uninstall_dotnet
 	uninstall_nginx
 	uninstall_docker
 
-	meco $cGreen "DServ programok/beallitasok torlese befejezve."
+	meco $cGreen "DServ programs/settings uninstall process finished."
 }
 
 install() {
@@ -393,6 +419,9 @@ install() {
 		;;
 	base)
 		install_base
+		;;
+	nodejs)
+		install_nodejs
 		;;
 	dotnet)
 		install_dotnet
@@ -428,6 +457,9 @@ uninstall() {
 	case $1 in
 	all)
 		uninstall_all
+		;;
+	nodejs)
+		uninstall_nodejs
 		;;
 	dotnet)
 		uninstall_dotnet

@@ -5,10 +5,10 @@ Commands:
     --help 
         Show these helpnotes.
 
-    install [all | base | virtualmin | dotnet | nginx | certbot | postgresql | openssh-server | openproject | docker]
+    install [all | base | virtualmin | nodejs | dotnet | nginx | certbot | postgresql | openssh-server | openproject | docker]
         Install packages automatically.
 
-    uninstall [all | virtualmin | dotnet | nginx | postgresql | openssh-server | openproject | docker]"
+    uninstall [all | virtualmin | nodejs | dotnet | nginx | postgresql | openssh-server | openproject | docker]"
         Uninstall packages automatically.
 
     isys 
