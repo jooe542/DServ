@@ -24,6 +24,6 @@ Commands:
         Show version.
 
 Basic package content:
-   net-tools, iproute2, wget, tree, htop, tmux, vim, ranger
+   net-tools, iproute2, wget, tree, htop, tmux, vim, tar, ranger
 
    Licenced under GPLv3
