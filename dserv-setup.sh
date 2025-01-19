@@ -72,7 +72,8 @@ install_nodejs() {
 	cd $appsDir
 	wget https://nodejs.org/dist/v22.13.0/node-v22.13.0-linux-x64.tar.xz
 	tar -xf node-v22.13.0-linux-x64.tar.xz 
-	echo PATH=$PATH:$appsDir/node-v22.13.0-linux-x64/bin >> /etc/bash.bashrc
+ 	echo PATH=$PATH:$appsDir/node-v22.13.0-linux-x64/bin >> /root/.bashrc
+	#echo PATH=$PATH:$appsDir/node-v22.13.0-linux-x64/bin >> /etc/bash.bashrc
 	rm node-v22.13.0-linux-x64.tar.xz
 
 	cd /
